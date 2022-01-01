@@ -13,8 +13,7 @@ const State = {
     POSITIONED: "POSITIONED",
 }
 
-const getPattern = (splitter, word) => {
-    const wordSet = new Set(word.split(""));
+const getPattern = (splitter, [word, wordSet]) => {
     return splitter.split("").map((splitLetter, idx) => {
         if (splitLetter === word[idx]) {
             return "g";
@@ -26,9 +25,8 @@ const getPattern = (splitter, word) => {
     }).join("");
 };
 
-const patternApplies = (pattern, word, log) => {
+const patternApplies = (pattern, [word, wordSet]) => {
     const result = pattern.every(([letter, state], idx) => {
-        const wordSet = new Set(word.split(""));
         if (state === State.NO) {
             return !wordSet.has(letter);
         } else if (state === State.PRESENT) {
@@ -47,15 +45,15 @@ const getScore = (splitter, cardinalities, words) => {
     return sum(cardinalities.map(c => Math.pow(target - c, 2))) / cardinalities.length;
 };
 
-const optimalSplitters = (splitters, words) => {
+const optimalSplitters = (splitters, wordAndSets) => {
     return sortBy(splitters, (splitter) => {
         const countByPattern = {};
-        words.forEach(word => {
-            const pattern =  getPattern(splitter, word);
+        wordAndSets.forEach(wordAndSet => {
+            const pattern =  getPattern(splitter, wordAndSet);
             countByPattern[pattern] = (countByPattern[pattern] ?? 0) + 1;
         });
         const scores = toPairs(countByPattern).map(([_pattern, count]) => count);
-        const score = getScore(splitter, scores, words);
+        const score = getScore(splitter, scores, wordAndSets);
         return score;
     });
 };
@@ -100,26 +98,26 @@ const getInput = (callback) => {
     });
 };
 
-const loopGuesses = (guesses, splitters, words) => {
-    if (words.length === 1) {
-        console.log(`The word: ${words[0]}`);
+const loopGuesses = (guesses, splitters, wordAndSets) => {
+    if (wordAndSets.length === 1) {
+        console.log(`The word: ${wordAndSets[0][0]}`);
         return rl.close();
+    } else if (wordAndSets.length < 10) {
+        const words = wordAndSets.map(([w]) => w);
+        console.log(`Remaining possible words: ${words.join(", ")}`);
     }
 
     console.log(`Try: ${guesses.join(", ")}`);
     return getInput((chosenGuess, resultPattern) => {
-        const nextWords = words.filter(word => patternApplies(resultPattern, word, true));
-        if (nextWords.length < 10) {
-            console.log(nextWords);
-        }
-        const nextGuesses = optimalSplitters(splitters, nextWords).slice(0, 5);
-        return loopGuesses(nextGuesses, splitters, nextWords);
+        const nextWordAndSets = wordAndSets.filter(wordAndSet => patternApplies(resultPattern, wordAndSet));
+        const nextGuesses = optimalSplitters(splitters, nextWordAndSets).slice(0, 5);
+        return loopGuesses(nextGuesses, splitters, nextWordAndSets);
     });
 };
 
-const words = fs.readFileSync("/usr/share/dict/words").toString().split("\n");
-const eligibleWords = words.filter(w => w.length === 5).map(w => w.toLowerCase())
+const words = fs.readFileSync("src/potential_answers.txt", 'utf8').split("\n").filter(w => w.length === 5).map(w => w.toLowerCase())
 
 // supposedly the optimal?
-const firstGuess = ["raise"];
-loopGuesses(firstGuess, eligibleWords, eligibleWords);
+const firstGuess = ["lares"];
+loopGuesses(firstGuess, words, words.map((w) => [w, new Set(w.split(""))]));
+//console.log(optimalSplitters(enterableWords, answerableWords).slice(0, 10));
