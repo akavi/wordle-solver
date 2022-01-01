@@ -1,5 +1,5 @@
 const fs = require('fs'); 
-const {minBy, zip, sum, toPairs, sortBy} = require('lodash');
+const {minBy, zip, sum, toPairs, countBy} = require('lodash');
 const Result = require('./result.ts');
 const readline = require('readline');
 const rl = readline.createInterface({
@@ -26,7 +26,7 @@ const getPattern = (splitter, [word, wordSet]) => {
 };
 
 const patternApplies = (pattern, [word, wordSet]) => {
-    const result = pattern.every(([letter, state], idx) => {
+    return pattern.every(([letter, state], idx) => {
         if (state === State.NO) {
             return !wordSet.has(letter);
         } else if (state === State.PRESENT) {
@@ -35,27 +35,21 @@ const patternApplies = (pattern, [word, wordSet]) => {
             return word[idx] === letter;
         }
     });
-    return result;
 };
 
 // An "optimal" split of the possibility space would be that the possible results evenly split
 // ie, each pattern 
-const getScore = (splitter, cardinalities, words) => {
-    const target = words.length/Math.pow(splitter.length, 3);
-    return sum(cardinalities.map(c => Math.pow(target - c, 2))) / cardinalities.length;
+const getScore = (splitter, wordAndSets) => {
+    const target = wordAndSets.length/Math.pow(splitter.length, 3);
+
+    const countByPattern = countBy(wordAndSets, was => getPattern(splitter, was));
+    console.log(countByPattern);
+    const scores = toPairs(countByPattern).map(([_pattern, count]) => count);
+    return sum(scores.map(c => Math.pow(target - c, 2))) / scores.length;
 };
 
-const optimalSplitters = (splitters, wordAndSets) => {
-    return minBy(splitters, (splitter) => {
-        const countByPattern = {};
-        wordAndSets.forEach(wordAndSet => {
-            const pattern =  getPattern(splitter, wordAndSet);
-            countByPattern[pattern] = (countByPattern[pattern] ?? 0) + 1;
-        });
-        const scores = toPairs(countByPattern).map(([_pattern, count]) => count);
-        const score = getScore(splitter, scores, wordAndSets);
-        return score;
-    });
+const optimalSplitter = (splitters, wordAndSets) => {
+    return minBy(splitters, (splitter) => getScore(splitter, wordAndSets));
 };
 
 const parseResult = (guess, resultInput) => {
@@ -99,7 +93,10 @@ const getInput = (guess, callback) => {
 };
 
 const loopGuesses = (guess, splitters, wordAndSets) => {
-    if (wordAndSets.length === 1) {
+    if (wordAndSets.length === 0) {
+        console.log(`Dunno`);
+        return rl.close();
+    } else if (wordAndSets.length === 1) {
         console.log(`The word: ${wordAndSets[0][0]}`);
         return rl.close();
     } else if (wordAndSets.length < 10) {
@@ -110,7 +107,7 @@ const loopGuesses = (guess, splitters, wordAndSets) => {
     console.log(`Try: ${guess}`);
     return getInput(guess, (resultPattern) => {
         const nextWordAndSets = wordAndSets.filter(wordAndSet => patternApplies(resultPattern, wordAndSet));
-        const nextGuess = optimalSplitters(splitters, nextWordAndSets);
+        const nextGuess = optimalSplitter(splitters, nextWordAndSets);
         return loopGuesses(nextGuess, splitters, nextWordAndSets);
     });
 };
@@ -120,4 +117,3 @@ const words = fs.readFileSync("src/potential_answers.txt", 'utf8').split("\n").f
 // supposedly the optimal?
 const firstGuess = "lares";
 loopGuesses(firstGuess, words, words.map((w) => [w, new Set(w.split(""))]));
-//console.log(optimalSplitters(enterableWords, answerableWords).slice(0, 10));
