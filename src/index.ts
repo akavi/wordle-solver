@@ -165,7 +165,7 @@ const loopGuesses = (guesses, splitters, words) => {
         return rl.close();
     }
 
-    console.log(`Try: ${guesses}`);
+    console.log(`Try: ${guesses.join(", ")}`);
     return getInput((chosenGuess, resultPattern) => {
         const nextWords = words.filter(word => patternApplies(resultPattern, word, true));
         if (nextWords.length < 10) {
