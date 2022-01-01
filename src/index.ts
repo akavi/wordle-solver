@@ -46,7 +46,7 @@ const getScore = (splitter, cardinalities, words) => {
 };
 
 const optimalSplitters = (splitters, wordAndSets) => {
-    return sortBy(splitters, (splitter) => {
+    return minBy(splitters, (splitter) => {
         const countByPattern = {};
         wordAndSets.forEach(wordAndSet => {
             const pattern =  getPattern(splitter, wordAndSet);
@@ -84,21 +84,21 @@ const parseInput = (input) => {
     return Result.collect([chosenGuess, resultPattern]);
 };
 
-const getInput = (callback) => {
+const getInput = (guess, callback) => {
     return rl.question(`Result: `, (input) => {
-        const parsedInput = parseInput(input);
+        const parsedInput = parseResult(guess, input);
         Result.apply(
             parsedInput,
-            ([chosenGuess, resultPattern]) => callback(chosenGuess, resultPattern),
+            (resultPattern) => callback(resultPattern),
             (err) => {
                 console.log(err);
-                return getInput(callback);
+                return getInput(guess, callback);
             },
         );
     });
 };
 
-const loopGuesses = (guesses, splitters, wordAndSets) => {
+const loopGuesses = (guess, splitters, wordAndSets) => {
     if (wordAndSets.length === 1) {
         console.log(`The word: ${wordAndSets[0][0]}`);
         return rl.close();
@@ -107,17 +107,17 @@ const loopGuesses = (guesses, splitters, wordAndSets) => {
         console.log(`Remaining possible words: ${words.join(", ")}`);
     }
 
-    console.log(`Try: ${guesses.join(", ")}`);
-    return getInput((chosenGuess, resultPattern) => {
+    console.log(`Try: ${guess}`);
+    return getInput(guess, (resultPattern) => {
         const nextWordAndSets = wordAndSets.filter(wordAndSet => patternApplies(resultPattern, wordAndSet));
-        const nextGuesses = optimalSplitters(splitters, nextWordAndSets).slice(0, 5);
-        return loopGuesses(nextGuesses, splitters, nextWordAndSets);
+        const nextGuess = optimalSplitters(splitters, nextWordAndSets);
+        return loopGuesses(nextGuess, splitters, nextWordAndSets);
     });
 };
 
 const words = fs.readFileSync("src/potential_answers.txt", 'utf8').split("\n").filter(w => w.length === 5).map(w => w.toLowerCase())
 
 // supposedly the optimal?
-const firstGuess = ["lares"];
+const firstGuess = "lares";
 loopGuesses(firstGuess, words, words.map((w) => [w, new Set(w.split(""))]));
 //console.log(optimalSplitters(enterableWords, answerableWords).slice(0, 10));
