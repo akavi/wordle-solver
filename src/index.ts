@@ -1,6 +1,9 @@
 const fs = require('fs'); 
 const {minBy, zip, sum, toPairs, countBy} = require('lodash');
 const Result = require('./result.ts');
+const { Command } = require('commander');
+const program = new Command();
+program.version('0.0.1');
 const readline = require('readline');
 const rl = readline.createInterface({
   input: process.stdin,
@@ -43,7 +46,6 @@ const getScore = (splitter, wordAndSets) => {
     const target = wordAndSets.length/Math.pow(splitter.length, 3);
 
     const countByPattern = countBy(wordAndSets, was => getPattern(splitter, was));
-    console.log(countByPattern);
     const scores = toPairs(countByPattern).map(([_pattern, count]) => count);
     return sum(scores.map(c => Math.pow(target - c, 2))) / scores.length;
 };
@@ -92,7 +94,7 @@ const getInput = (guess, callback) => {
     });
 };
 
-const loopGuesses = (guess, splitters, wordAndSets) => {
+const loopGuesses = (guess, splitters, wordAndSets, hardMode = true) => {
     if (wordAndSets.length === 0) {
         console.log(`Dunno`);
         return rl.close();
@@ -107,13 +109,19 @@ const loopGuesses = (guess, splitters, wordAndSets) => {
     console.log(`Try: ${guess}`);
     return getInput(guess, (resultPattern) => {
         const nextWordAndSets = wordAndSets.filter(wordAndSet => patternApplies(resultPattern, wordAndSet));
-        const nextGuess = optimalSplitter(splitters, nextWordAndSets);
-        return loopGuesses(nextGuess, splitters, nextWordAndSets);
+        const nextSplitters = hardMode ? nextWordAndSets.map(([w]) => w) : splitters;
+        const nextGuess = optimalSplitter(nextSplitters, nextWordAndSets);
+        return loopGuesses(nextGuess, nextSplitters, nextWordAndSets);
     });
 };
+
+program
+  .option('-h, --hard_mode', 'enable hard mode');
+
+const options = program.opts()
 
 const words = fs.readFileSync("src/potential_answers.txt", 'utf8').split("\n").filter(w => w.length === 5).map(w => w.toLowerCase())
 
 // supposedly the optimal?
 const firstGuess = "lares";
-loopGuesses(firstGuess, words, words.map((w) => [w, new Set(w.split(""))]));
+loopGuesses(firstGuess, words, words.map((w) => [w, new Set(w.split(""))]), !!options.hard_mode);
