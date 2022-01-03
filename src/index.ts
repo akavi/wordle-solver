@@ -1,5 +1,5 @@
 const fs = require('fs'); 
-const {minBy, zip, sum, toPairs, countBy} = require('lodash');
+const {sortBy, zip, sum, toPairs, countBy, find} = require('lodash');
 const Result = require('./result.ts');
 const { Command } = require('commander');
 const program = new Command();
@@ -9,6 +9,16 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
+
+const minsBy = (arr, fn) => {
+    if (arr.length === 0) {
+        return arr;
+    }
+
+    const sorted = sortBy(arr.map(v => [v, fn(v)]), ([_v, k]) => k);
+    const minKey = sorted[0][1];
+    return sorted.filter(([_v, k]) => k === minKey).map(([v]) => v);
+};
 
 const State = {
     NO: "NO",
@@ -50,8 +60,15 @@ const getScore = (splitter, wordAndSets) => {
     return sum(scores.map(c => Math.pow(target - c, 2))) / scores.length;
 };
 
-const optimalSplitter = (splitters, wordAndSets) => {
-    return minBy(splitters, (splitter) => getScore(splitter, wordAndSets));
+const optimalInput = (inputs, wordAndSets) => {
+    if (inputs.length === 0) {
+        return null;
+    };
+
+    const mins = minsBy(inputs, ([input]) => getScore(input, wordAndSets));
+    const solutionMin = find(mins, ([_i, isSolution]) => isSolution);
+
+    return solutionMin ? solutionMin[0] : mins[0][0];
 };
 
 const parseResult = (guess, resultInput) => {
@@ -94,8 +111,8 @@ const getInput = (guess, callback) => {
     });
 };
 
-const loopGuesses = (guess, splitters, wordAndSets, hardMode = true) => {
-    if (wordAndSets.length === 0) {
+const loopGuesses = (guess, inputs, wordAndSets, hardMode = true) => {
+    if (wordAndSets.length === 0 || guess == null) {
         console.log(`Dunno`);
         return rl.close();
     } else if (wordAndSets.length === 1) {
@@ -109,9 +126,15 @@ const loopGuesses = (guess, splitters, wordAndSets, hardMode = true) => {
     console.log(`Try: ${guess}`);
     return getInput(guess, (resultPattern) => {
         const nextWordAndSets = wordAndSets.filter(wordAndSet => patternApplies(resultPattern, wordAndSet));
-        const nextSplitters = hardMode ? nextWordAndSets.map(([w]) => w) : splitters;
-        const nextGuess = optimalSplitter(nextSplitters, nextWordAndSets);
-        return loopGuesses(nextGuess, nextSplitters, nextWordAndSets);
+
+        const nextWords = nextWordAndSets.map(([w]) => w);
+        const solutionSet = new Set(nextWords);
+        // this isn't right
+        // TODO: in hard mode, we should filter inputs by patternAppplies
+        const nextInputs = hardMode ? nextWords.map(w => [w, solutionSet.has(w)]): inputs.map(([w]) => [w, solutionSet.has(w)]);
+
+        const nextGuess = optimalInput(nextInputs, nextWordAndSets);
+        return loopGuesses(nextGuess, nextInputs, nextWordAndSets);
     });
 };
 
@@ -120,8 +143,11 @@ program
 
 const options = program.opts()
 
-const words = fs.readFileSync("src/potential_answers.txt", 'utf8').split("\n").filter(w => w.length === 5).map(w => w.toLowerCase())
+const inputs = fs.readFileSync("src/potential_inputs.txt", 'utf8').split("\n").map(w => w.trim()).filter(w => w.length === 5).map(w => w.toLowerCase())
+const solutions = fs.readFileSync("src/potential_solutions.txt", 'utf8').split("\n").map(w => w.trim()).filter(w => w.length === 5).map(w => w.toLowerCase())
+
+const solutionSet = new Set(solutions);
 
 // supposedly the optimal?
-const firstGuess = "lares";
-loopGuesses(firstGuess, words, words.map((w) => [w, new Set(w.split(""))]), !!options.hard_mode);
+const firstGuess = "raise";
+loopGuesses(firstGuess, inputs.map(w => [w, solutionSet.has(w)]), solutions.map((w) => [w, new Set(w.split(""))]), !!options.hard_mode);
