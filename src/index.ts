@@ -1,5 +1,5 @@
 const fs = require('fs'); 
-const {sortBy, zip, sum, toPairs, countBy, find} = require('lodash');
+const {sortBy, zip, sum, toPairs, countBy, find, mean} = require('lodash');
 const Result = require('./result.ts');
 const { Command } = require('commander');
 const program = new Command();
@@ -138,6 +138,30 @@ const loopGuesses = (guess, inputs, wordAndSets, hardMode = true) => {
     });
 };
 
+const howLong = (word, guess, inputs, wordAndSets, hardMode = false) => {
+    if (wordAndSets.length === 0 || guess == null) {
+        throw new Error("Something went wrong, no answers");
+    } else if (wordAndSets.length === 1) {
+        return 1;
+    }
+
+    const resultPattern = parseResult(guess, getPattern(guess, [word, new Set(word.split(""))])).val;
+    if (resultPattern.every(([_, s]) => s === State.POSITIONED)) {
+        return 1;
+    };
+
+    const nextWordAndSets = wordAndSets.filter(wordAndSet => patternApplies(resultPattern, wordAndSet));
+
+    const nextWords = nextWordAndSets.map(([w]) => w);
+    const solutionSet = new Set(nextWords);
+    // this isn't right
+    // TODO: in hard mode, we should filter inputs by patternAppplies
+    const nextInputs = hardMode ? nextWords.map(w => [w, solutionSet.has(w)]): inputs.map(([w]) => [w, solutionSet.has(w)]);
+
+    const nextGuess = optimalInput(nextInputs, nextWordAndSets);
+    return 1 + howLong(word, nextGuess, nextInputs, nextWordAndSets, hardMode);
+};
+
 program
   .option('-h, --hard_mode', 'enable hard mode');
 
@@ -151,3 +175,4 @@ const solutionSet = new Set(solutions);
 // supposedly the optimal?
 const firstGuess = "raise";
 loopGuesses(firstGuess, inputs.map(w => [w, solutionSet.has(w)]), solutions.map((w) => [w, new Set(w.split(""))]), !!options.hard_mode);
+
